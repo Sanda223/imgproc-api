@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Better Image – Create Job</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+</head>
+<body style="margin:0;font-family:'Inter',sans-serif;background:linear-gradient(135deg,#6b73ff 0%,#000dff 100%);height:100vh;display:flex;flex-direction:column;color:#fff;">
+
+  <!-- Top Bar -->
+<div style="width:94.5%;height:80px;flex-shrink:0;background:#2d2a52;display:flex;align-items:center;justify-content:space-between;padding:0 40px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+  <h1 style="margin:0;font-size:2rem;color:#fff;">Better Image</h1>
+
+  <button style="padding:14px 28px;border:none;border-radius:8px;background:linear-gradient(90deg,#4776e6,#8e54e9);color:#fff;font-weight:600;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.2);">
+    Log Out
+  </button>
+</div>
+
+
+  <!-- Main Content -->
+  <div style="flex:1;display:flex;justify-content:center;align-items:flex-start;gap:40px;padding:40px;flex-wrap:wrap;">
+
+    <!-- Create Job Card -->
+    <div style="background:#2d2a52;border-radius:16px;padding:30px;width:400px;box-shadow:0 8px 30px rgba(0,0,0,0.25);">
+      <h2 style="margin-top:0;margin-bottom:20px;font-size:1.5rem;;margin-left: 120px;">CREATE JOB</h2>
+
+      <form>
+        <div style="margin-top:20px;">
+          <h3 style="margin:0 0 6px;color:#cfcff2;">Source</h3>
+          <label style="display:block;">
+            <input type="file" accept="image/*" style="width:92%;padding:15px;margin-bottom:12px;border:2px solid #5c58a3;border-radius:8px;background:#3b3770;color:#fff;">
+          </label>
+        </div>
+
+        <div style="margin-top:20px;">
+          <h3 style="margin:0 0 6px;color:#cfcff2;">Resize</h3>
+          <div style="display:flex;gap:12px;margin-bottom:12px;">
+            <label style="flex:1;">
+              <input type="number" placeholder="Width: eg 1920" style="width:83%;padding:15px;border:2px solid #5c58a3;border-radius:8px;background:#3b3770;color:#fff;">
+            </label>
+            <label style="flex:1;">
+              <input type="number" placeholder="Height: eg 1080" style="width:83%;padding:15px;border:2px solid #5c58a3;border-radius:8px;background:#3b3770;color:#fff;">
+            </label>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;">
+          <h3 style="margin:0 0 6px;color:#cfcff2;">Blur</h3>
+          <label style="display:block;">
+            <input type="number" placeholder="Sigma: eg 2" style="width:92%;padding:15px;margin-bottom:12px;border:2px solid #5c58a3;border-radius:8px;background:#3b3770;color:#fff;">
+          </label>
+        </div>
+
+        <div style="margin-top:20px;">
+          <h3 style="margin:0 0 6px;color:#cfcff2;">Sharpen</h3>
+          <label style="display:block;">
+            <input type="number" placeholder="Sigma: eg 1" style="width:92%;padding:15px;margin-bottom:12px;border:2px solid #5c58a3;border-radius:8px;background:#3b3770;color:#fff;">
+          </label>
+        </div>
+
+        <button type="submit" style="width:100%;padding:12px;border:none;border-radius:8px;background:linear-gradient(90deg,#4776e6,#8e54e9);color:#fff;font-weight:bold;cursor:pointer;">
+          Submit Job
+        </button>
+      </form>
+    </div>
+
+    <!-- Output Card -->
+    <div style="background:#2d2a52;border-radius:16px;padding:30px;flex:1;box-shadow:0 8px 30px rgba(0,0,0,0.25);min-width:400px;">
+      <h2 style="margin-top:0;font-size:1.5rem;;margin-left: 350px;">OUTPUT</h2>
+      <div id="outputArea" style="margin-top:20px;height:450px;border-radius:8px;background:#3b3770;display:flex;align-items:center;justify-content:center;color:#cfcff2;">
+        No output yet
+      </div>
+    </div>
+
+    <!-- Job History Card -->
+    <div style="background:#2d2a52;border-radius:16px;padding:30px;box-shadow:0 8px 30px rgba(0,0,0,0.25);width:100%;margin-top:0px;">
+      <h2 style="margin-top:0;font-size:1.5rem;text-align:center;">JOB HISTORY</h2>
+      <div style="margin-top:20px;height:200px;border-radius:8px;background:#3b3770;display:flex;align-items:center;justify-content:center;color:#cfcff2;">
+        No job history yet
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

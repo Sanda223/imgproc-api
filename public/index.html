@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Better Image – Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+</head>
+
+<script>
+  const token = localStorage.getItem("jwt");
+  if (!token) {
+    window.location.href = "/login";
+  } else {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const now = Math.floor(Date.now() / 1000);
+      if (payload.exp && now >= payload.exp) {
+        localStorage.removeItem("jwt");
+        window.location.href = "/login";
+      }
+    } catch {
+      localStorage.removeItem("jwt");
+      window.location.href = "/login";
+    }
+  }
+</script>
+
+<body style="margin:0;font-family:'Inter',sans-serif;background:linear-gradient(135deg,#6b73ff 0%,#000dff 100%);min-height:100vh;display:flex;flex-direction:column;color:#fff;">
+
+  <!-- Top Bar -->
+  <div style="width:94.5%;height:80px;background:#2d2a52;display:flex;align-items:center;justify-content:space-between;padding:0 40px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+    <h1 style="margin:0;font-size:2rem;color:#fff;">Better Image</h1>
+    <div style="display:flex;gap:16px;align-items:center;">
+      <div id="authStatus" style="color:#cfcff2;"></div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div style="flex:1;display:flex;justify-content:center;align-items:flex-start;gap:40px;padding:40px;flex-wrap:wrap;">
+
+    <!-- Create Job Card -->
+    <div class="card" style="background:#2d2a52;border-radius:16px;padding:30px;width:420px;box-shadow:0 8px 30px rgba(0,0,0,0.25);">
+      <h2 style="margin-top:0;margin-bottom:20px;font-size:1.5rem;text-align:center;">CREATE JOB</h2>
+
+      <!-- IDs must match main.js handlers -->
+      <form id="jobForm">
+        <div style="margin-top:8px;">
+          <h3 style="margin:0 0 6px;color:#cfcff2;">Source</h3>
+          <select id="sourceId" style="width:100%;padding:12px;border:2px solid #5c58a3;border-radius:8px;background:#3b3770;color:#fff;">
+            <option value="seed">Seed (built-in)</option>
+          </select>
+        </div>
+
+        <div style="margin-top:16px;">
+          <h3 style="margin:0 0 6px;color:#cfcff2;">Resize</h3>
+          <div style="display:flex;gap:12px;margin-bottom:12px;">
+            <input id="w" type="number" value="1920" placeholder="Width" style="flex:1;padding:12px;border:2px solid #5c58a3;border-radius:8px;background:#3b3770;color:#fff;">
+            <input id="h" type="number" value="1080" placeholder="Height" style="flex:1;padding:12px;border:2px solid #5c58a3;border-radius:8px;background:#3b3770;color:#fff;">
+          </div>
+        </div>
+
+        <div style="margin-top:16px;">
+          <h3 style="margin:0 0 6px;color:#cfcff2;">Blur</h3>
+          <input id="blur" type="number" step="1" value="2" placeholder="Sigma" style="width:93%;padding:12px;border:2px solid #5c58a3;border-radius:8px;background:#3b3770;color:#fff;">
+        </div>
+
+        <div style="margin-top:16px;">
+          <h3 style="margin:0 0 6px;color:#cfcff2;">Sharpen</h3>
+          <input id="sharpen" type="number" step="1" value="1" placeholder="Sigma" style="width:93%;padding:12px;border:2px solid #5c58a3;border-radius:8px;background:#3b3770;color:#fff;">
+        </div>
+
+        <button type="submit" style="margin-top:18px;width:100%;padding:12px;border:none;border-radius:8px;background:linear-gradient(90deg,#4776e6,#8e54e9);color:#fff;font-weight:bold;cursor:pointer;">
+          Submit Job
+        </button>
+      </form>
+    </div>
+
+
+<style>
+  #output img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+  }
+
+  #output {
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* --- Jobs list modern table styling --- */
+  #jobsList table {
+    width: 100%;
+    border-collapse: separate;       /* allow row gaps */
+    border-spacing: 0 10px;          /* vertical space between rows */
+  }
+
+  #jobsList thead th {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    position: sticky;                /* keeps header visible when scrolling */
+    top: 0;
+    background: #3b3770;
+    z-index: 1;
+  }
+
+  #jobsList tbody tr {
+    background: #4a4794;             /* row background */
+    transition: background .15s ease, transform .05s ease;
+  }
+
+  #jobsList tbody tr:hover {
+    background: #5b57b0;             /* hover color */
+  }
+
+  #jobsList tbody td {
+    padding: 10px 12px;
+  }
+
+  /* Rounded "pill" effect per row */
+  #jobsList tbody tr td:first-child {
+    border-top-left-radius: 10px;
+    border-bottom-left-radius: 10px;
+  }
+  #jobsList tbody tr td:last-child {
+    border-top-right-radius: 10px;
+    border-bottom-right-radius: 10px;
+  }
+
+  /* Optional subtle shadow to lift each row */
+  #jobsList tbody tr td {
+    box-shadow: 0 1px 0 rgba(0,0,0,0.10);
+  }
+
+  /* Buttons inside the jobs list */
+  #jobsList .dlOneBtn {
+    padding: 6px 10px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(90deg,#4776e6,#8e54e9);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+  }
+</style>
+
+    <!-- Output Card -->
+<div class="card" style="background:#2d2a52;border-radius:16px;padding:30px;flex:1;box-shadow:0 8px 30px rgba(0,0,0,0.25);min-width:420px;">
+  <h2 style="margin-top:0;font-size:1.5rem;text-align:center;">OUTPUT</h2>
+
+  <div id="outputActions" style="display:flex;justify-content:flex-end;margin-top:-36px;margin-bottom:8px;">
+    <button id="downloadBtn" disabled
+      style="padding:8px 16px;border:none;border-radius:8px;background:linear-gradient(90deg,#4776e6,#8e54e9);color:#fff;font-weight:600;cursor:pointer;opacity:0.8;">
+      Download Output
+    </button>
+  </div>
+
+  <div id="output" style="
+      margin-top:12px;
+      min-height:420px;
+      max-height:420px;
+      overflow:auto;
+      border-radius:8px;
+      background:#3b3770;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#cfcff2;
+      padding:12px;
+  ">
+    No output yet
+  </div>
+</div>
+
+    <!-- Job History Card -->
+<div class="card" style="background:#2d2a52;border-radius:16px;padding:30px;box-shadow:0 8px 30px rgba(0,0,0,0.25);width:100%;margin-top:0;">
+  <h2 style="margin-top:0;font-size:1.5rem;text-align:center;">JOB HISTORY</h2>
+  <div id="jobsList" style="
+      margin-top:16px;
+      min-height:300px;
+      max-height:240px;
+      overflow-y:auto;
+      border-radius:8px;
+      background:#3b3770;
+      color:#cfcff2;
+      padding:12px;
+  ">
+    Loading…
+  </div>
+</div>
+  </div>
+
+  <script src="/public/main.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Better Image – Login</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+</head>
+<body style="margin:0;font-family:'Inter',sans-serif;background:linear-gradient(135deg,#6b73ff 0%,#000dff 100%);height:100vh;display:flex;flex-direction:column;align-items:center;color:#fff;">
+
+  <!-- Top Bar -->
+  <div style="width:94.5%;height:80px;background:#2d2a52;display:flex;align-items:center;padding:0 40px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+    <h1 style="margin:0;font-size:1.8rem;margin-left:35px;color:#fff;">Better Image</h1>
+    <div id="authStatus" style="margin-left:auto;color:#cfcff2;"></div>
+  </div>
+
+  <!-- Centered Card -->
+  <div style="flex:1;display:flex;justify-content:center;align-items:center;width:100%;">
+    <div style="background:#2d2a52;border-radius:16px;padding:40px;width:320px;box-shadow:0 8px 30px rgba(0,0,0,0.25);text-align:center;">
+      <h2 style="margin-bottom:8px;font-size:1.8rem;color:#fff;">Welcome Back</h2>
+      <p style="margin-bottom:24px;color:#cfcff2;font-size:0.9rem;">Sign in to your account</p>
+
+      <!-- IDs must match main.js handlers -->
+      <form id="loginForm">
+        <input id="username" type="text" placeholder="Username" required
+               style="width:93%;padding:12px;margin-bottom:12px;border:none;border-radius:8px;background:#3b3770;color:#fff;font-size:0.9rem;outline:none;">
+        <input id="password" type="password" placeholder="Password" required
+               style="width:93%;padding:12px;margin-bottom:20px;border:none;border-radius:8px;background:#3b3770;color:#fff;font-size:0.9rem;outline:none;">
+
+        <button type="submit"
+          style="width:100%;padding:12px;border:none;border-radius:8px;background:linear-gradient(90deg,#4776e6,#8e54e9);color:#fff;font-weight:bold;cursor:pointer;margin-bottom:20px;">
+          Sign In
+        </button>
+      </form>
+
+      <p style="margin-top:16px;font-size:0.85rem;color:#ccc;">Don’t have an account?
+        <a href="/public/signup.html" style="color:#7fc3ff;text-decoration:none;">Sign up</a>
+      </p>
+
+      <p style="margin-top:4px;font-size:0.85rem;color:#ccc;">Need to confirm?
+        <a href="/public/confirm.html" style="color:#7fc3ff;text-decoration:none;">Enter code</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="/public/main.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>IMGPROC API Client</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 16px; max-width: none; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .grid-row { display: flex; gap: 16px; align-items: stretch; }
+    .grid-row > .card { flex: 1 1 0; }
+    .row-top { margin-bottom: 16px; }
+    @media (max-width: 900px) {
+      .grid-row { flex-direction: column; }
+    }
+    input,button,select { padding: 8px; margin: 4px 0; }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; flex: 1; min-width: 260px; }
+    img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #e5e7eb; }
+    code { background: #f6f8fa; padding: 2px 6px; border-radius: 6px; }
+    .muted { color: #6b7280; font-size: 0.9em; }
+    #jobResult { max-height: 140px; overflow: auto; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>IMGPROC – Demo Client</h1>
+    <div id="authStatus" class="muted">Not logged in</div>
+  </header>
+
+  <div class="grid-row row-top">
+    <!-- Sign Up -->
+    <section class="card">
+      <h2>1) Sign Up</h2>
+      <form id="signupForm">
+        <label>Username<br><input id="suUsername" required></label><br>
+        <label>Email<br><input id="suEmail" type="email" required></label><br>
+        <label>Password<br><input id="suPassword" type="password" required></label><br>
+        <button type="submit">Sign Up</button>
+      </form>
+    </section>
+
+    <!-- Confirm -->
+    <section class="card">
+      <h2>2) Confirm</h2>
+      <form id="confirmForm">
+        <label>Username<br><input id="cUsername" required></label><br>
+        <label>Code<br><input id="cCode" required></label><br>
+        <button type="submit">Confirm</button>
+      </form>
+    </section>
+
+    <!-- Login -->
+    <section class="card">
+      <h2>3) Login</h2>
+      <form id="loginForm">
+        <label>Username<br><input id="username" required></label><br>
+        <label>Password<br><input id="password" type="password" required></label><br>
+        <button type="submit">Login</button>
+      </form>
+    </section>
+  </div>
+
+  <div class="grid-row">
+    <!-- Create Job -->
+    <section class="card">
+      <h2>4) Create Job</h2>
+      <form id="jobForm">
+        <label>Source
+          <select id="sourceId">
+            <option value="seed">Seed (built-in)</option>
+          </select>
+        </label>
+        <div class="row">
+          <div>
+            <h3>Resize</h3>
+            <label>Width <input id="w" type="number" value="1920"></label><br>
+            <label>Height <input id="h" type="number" value="1080"></label>
+          </div>
+          <div>
+            <h3>Blur</h3>
+            <label>Sigma <input id="blur" type="number" step="1" value="2"></label>
+          </div>
+          <div>
+            <h3>Sharpen</h3>
+            <label>Sigma <input id="sharpen" type="number" step="1" value="1"></label>
+          </div>
+        </div>
+        <button type="submit">Submit Job</button>
+      </form>
+      <pre id="jobResult" class="muted"></pre>
+    </section>
+
+    <!-- Output -->
+    <section class="card">
+      <h2>5) Output</h2>
+      <div id="output"></div>
+    </section>
+  </div>
+
+  <script src="/public/main.js" type="module"></script>
+</body>
+</html>
