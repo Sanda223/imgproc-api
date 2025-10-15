@@ -18,8 +18,39 @@ async function streamToBuffer(stream: any): Promise<Buffer> {
   });
 }
 
+async function runSharpPipeline(inputBuf: Buffer, ops: Op[]) {
+  let img = sharp(inputBuf, { failOn: "none" });
+  for (const step of ops) {
+    if (step.op === "resize") img = img.resize(step.width, step.height, { fit: "fill" });
+    if (step.op === "blur") img = img.blur(step.sigma);
+    if (step.op === "sharpen") img = img.sharpen(step.sigma);
+  }
+  return img.png().toBuffer();
+}
+
+async function writeOutputToS3(outputKey: string, outputBuf: Buffer) {
+  const bucket = Config.S3_BUCKET;
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: outputKey,
+      Body: outputBuf,
+      ContentType: "image/png",
+    })
+  );
+}
+
 /**
- * Run Sharp pipeline with input/output stored in S3.
+ * Run Sharp pipeline with raw Buffer input and upload the PNG result to S3.
+ */
+export async function runPipelineBuffer(inputBuf: Buffer, ops: Op[], outputKey: string) {
+  const outputBuf = await runSharpPipeline(inputBuf, ops);
+  await writeOutputToS3(outputKey, outputBuf);
+  return { outputKey };
+}
+
+/**
+ * Run Sharp pipeline with input stored in S3 (legacy seed flow).
  * @param inputKey - S3 key for input (e.g. "seed/seed.png")
  * @param ops - array of processing steps
  * @param outputKey - S3 key for output (e.g. "users/u1/jobs/j1/output.png")
@@ -31,24 +62,6 @@ export async function runPipelineS3(inputKey: string, ops: Op[], outputKey: stri
   const inputObj = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: inputKey }));
   const inputBuf = await streamToBuffer(inputObj.Body as any);
 
-  // 2) run sharp ops
-  let img = sharp(inputBuf, { failOn: "none" });
-  for (const step of ops) {
-    if (step.op === "resize") img = img.resize(step.width, step.height, { fit: "fill" });
-    if (step.op === "blur") img = img.blur(step.sigma);
-    if (step.op === "sharpen") img = img.sharpen(step.sigma);
-  }
-  const outputBuf = await img.png().toBuffer();
-
-  // 3) write output to S3
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: outputKey,
-      Body: outputBuf,
-      ContentType: "image/png",
-    })
-  );
-
-  return { outputKey };
+  // 2+3) process and write output
+  return runPipelineBuffer(inputBuf, ops, outputKey);
 }
