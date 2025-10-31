@@ -94,7 +94,7 @@ The platform performed CPU-intensive image transformations (resize, blur, sharpe
 
 ---
 
-## Infrastructure-as-Code Example (CDK)
+## Infrastructure-as-Code(CDK)
 
 ```ts
 const apiService = new ecs.FargateService(this, 'ApiService', {
