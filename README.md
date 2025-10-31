@@ -3,7 +3,7 @@
 A **cloud-native image processing system** built with **Node.js + Express + TypeScript**, fully containerised with **Docker** and deployed across **AWS ECS (Fargate)** using images hosted in **ECR**.  
 The platform performed CPU-intensive image transformations (resize, blur, sharpen) using [Sharp](https://sharp.pixelplumbing.com/), scaling horizontally across containers to sustain **80%+ CPU load** under concurrent requests.
 
-## Note: The previous repo had an issue and which why there is now a new repo.
+Note: The previous repo had an issue and which why there is now a new repo.
 
 ---
 
