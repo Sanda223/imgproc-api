@@ -1,179 +1,140 @@
-# 📘 Image Processing API (CAB432 Assignment 1)
+# AWS Image Processing Platform
 
-A REST API built with **Node.js + Express + TypeScript**, containerised with **Docker**, and deployable on **AWS EC2 via ECR**.  
-This app demonstrates CPU-intensive image processing using [Sharp](https://sharp.pixelplumbing.com/) — resizing, blurring, and sharpening images up to 8K resolution — to sustain >80% CPU load.
-
----
-
-## ✨ Features
-- **REST API** with endpoints for auth, jobs, and images.  
-- **JWT Authentication** (two hardcoded users: `alice` + `bob`).  
-- **CPU-intensive image pipeline** using Sharp (resize + blur + sharpen).  
-- **Two data types**:  
-  - Unstructured → images (`.png`)  
-  - Structured → job metadata (UUIDs in memory)  
-- **Containerised with Docker** and ready for AWS deployment.  
-- Includes a **load test script** to drive CPU >80%.  
+A **cloud-native image processing system** built with **Node.js + Express + TypeScript**, fully containerised with **Docker** and deployed across **AWS ECS (Fargate)** using images hosted in **ECR**.  
+The platform performed CPU-intensive image transformations (resize, blur, sharpen) using [Sharp](https://sharp.pixelplumbing.com/), scaling horizontally across containers to sustain **80%+ CPU load** under concurrent requests.
 
 ---
 
-## 🚀 Getting Started (Local Dev)
+## Features
 
-### 1. Install dependencies
-```bash
-npm install
-```
-
-### 2. Generate seed image
-```bash
-npx ts-node scripts/generate_seed.ts
-```
-
-### 3. Run the API (dev mode)
-```bash
-export JWT_SECRET=changeme
-npm run dev
-```
-API will be available at: [http://localhost:3000](http://localhost:3000)
+- **Microservice architecture** with isolated containers for the REST API and the image-processing worker  
+- **Asynchronous job handling** with **SQS** queueing and **presigned S3 uploads**  
+- **Secure authentication** using **AWS Cognito** (JWT-based)  
+- **Autoscaling** via **ECS Service Auto Scaling** with CloudWatch metrics  
+- **HTTPS** served through **Application Load Balancer (ALB)** and **ACM certificates**  
+- **Infrastructure-as-Code (IaC)** using AWS CDK for consistent, repeatable deployments  
+- **Monitoring and logging** integrated with **CloudWatch** dashboards and alerts  
+- **CI/CD pipeline** via **GitHub Actions → ECR → ECS rollout**  
+- **Edge caching** for static frontend assets with **CloudFront**  
 
 ---
 
-## 🔑 Authentication
-Login with hardcoded credentials:
+## Architecture Overview
 
-```bash
-curl -X POST http://localhost:3000/v1/auth/login  -H "Content-Type: application/json"  -d '{"username":"alice","password":"password1"}'
-```
-
-Response:
-```json
-{ "token": "<JWT_TOKEN>" }
-```
-
-Use this token in all `Authorization` headers:
-```
-Authorization: Bearer <JWT_TOKEN>
-```
+| Service | Role | AWS Components |
+|----------|------|----------------|
+| **API Service** | Handles authentication, job creation, and image retrieval | ECS (Fargate), ALB, Cognito, CloudWatch |
+| **Worker Service** | Performs CPU-intensive Sharp image processing | ECS (Fargate), SQS, CloudWatch |
+| **Storage Layer** | Persists uploaded and processed images | S3, DynamoDB |
+| **Load Distribution** | Routes requests and balances traffic | ALB, SQS |
+| **Monitoring & Scaling** | Tracks CPU metrics and triggers scale-in/out events | CloudWatch, Application Auto Scaling |
+| **CI/CD Pipeline** | Automates container builds and deployments | GitHub Actions, ECR, ECS |
+| **Security & Access** | Manages authentication and HTTPS | Cognito, ACM, Route 53 |
+| **Edge Caching** | Serves cached static assets globally | CloudFront |
 
 ---
 
-## 🖼️ Example Job
-Submit a CPU-heavy image job:
+## AWS Deployment Summary
 
-```bash
-curl -X POST http://localhost:3000/v1/jobs  -H "Authorization: Bearer <JWT_TOKEN>"  -H "Content-Type: application/json"  -d '{
-  "sourceId":"seed",
-  "ops":[
-    {"op":"resize","width":7680,"height":4320},
-    {"op":"blur","sigma":10},
-    {"op":"sharpen","sigma":2},
-    {"op":"resize","width":7680,"height":4320}
-  ]
-}'
-```
-
-Response:
-```json
-{
-  "id": "ea93a2fb-1984-42d9-a924-ff35f2955284",
-  "output": {
-    "imageId": "ea93a2fb-1984-42d9-a924-ff35f2955284",
-    "url": "/v1/images/ea93a2fb-1984-42d9-a924-ff35f2955284"
-  }
-}
-```
-
-View the result:
-```
-http://localhost:3000/v1/images/ea93a2fb-1984-42d9-a924-ff35f2955284
-```
+1. **Dockerised** both API and worker services independently  
+2. **Published images** to **AWS Elastic Container Registry (ECR)**  
+3. **Deployed containers** on **AWS ECS (Fargate)** using ECS services and task definitions  
+4. **Configured Application Load Balancer (ALB)** for HTTPS and routing rules  
+5. **Implemented autoscaling** based on CloudWatch metrics (CPU > 70%)  
+6. **Used SQS** to distribute workload evenly among worker containers  
+7. **Enabled CloudWatch logging** for real-time observability and error tracking  
+8. **Provisioned all infrastructure via AWS CDK**, enabling one-click redeployment  
 
 ---
 
-## 📈 Load Testing
-Hammer the API to prove >80% CPU:
+## Workflow Overview
 
-```bash
-export JWT=<YOUR_TOKEN>
-npm run load:test
-```
-
-Optional parameters:
-```bash
-C=12 D=300 npm run load:test   # 12 workers for 5 minutes
-```
-
-Watch CPU usage with **Activity Monitor** (Mac) or `top`.
+1. **User uploads an image** via presigned S3 URL  
+2. **API service** creates a new job record in DynamoDB and queues the task in SQS  
+3. **Worker service** fetches messages from SQS, processes the image with Sharp, and stores the result in S3  
+4. **Job metadata** is updated in DynamoDB with the processed image URL  
+5. **User retrieves** the result through a signed URL generated by the API  
 
 ---
 
-## 🐳 Docker
+## Core AWS Services
 
-### Build
-```bash
-docker buildx build --platform linux/amd64 -t imgproc-api:0.1.0 .
-```
-
-### Run
-```bash
-docker run --rm --platform linux/amd64 -p 3000:3000  -e JWT_SECRET=$(openssl rand -hex 16)  imgproc-api:0.1.0
-```
-
----
-
-## ☁️ AWS Deployment (Summary)
-1. Build & tag the image.  
-2. Push to AWS ECR:
-   ```bash
-   aws ecr create-repository --repository-name imgproc-api
-   aws ecr get-login-password --region ap-southeast-2    | docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.ap-southeast-2.amazonaws.com
-
-   docker tag imgproc-api:0.1.0 <ACCOUNT_ID>.dkr.ecr.ap-southeast-2.amazonaws.com/imgproc-api:0.1.0
-   docker push <ACCOUNT_ID>.dkr.ecr.ap-southeast-2.amazonaws.com/imgproc-api:0.1.0
-   ```
-
-3. On EC2 (Ubuntu 24.04), install Docker, then:
-   ```bash
-   sudo docker pull <ACCOUNT_ID>.dkr.ecr.ap-southeast-2.amazonaws.com/imgproc-api:0.1.0
-   sudo docker run -d -p 80:3000 -e JWT_SECRET=$(openssl rand -hex 16) imgproc-api:0.1.0
-   ```
-
-4. Test via EC2 public DNS:
-   ```
-   http://<ec2-public-dns>/v1/auth/login
-   ```
+- **ECS (Fargate)** – container orchestration and autoscaling  
+- **ECR** – private container image registry  
+- **S3** – object storage for uploads and outputs  
+- **SQS** – distributed job queue for worker containers  
+- **DynamoDB** – metadata persistence  
+- **Cognito** – authentication and JWT token management  
+- **CloudWatch** – metrics, logging, autoscaling triggers  
+- **ALB + ACM** – HTTPS routing with SSL certificates  
+- **CloudFront** – edge caching for global static asset delivery  
+- **CDK (IaC)** – automated provisioning and teardown  
+- **GitHub Actions** – CI/CD automation  
 
 ---
 
-## 📂 Project Structure
-```
-src/
- ├── routes/          # Express routes (auth, jobs, images)
- ├── middleware/      # JWT auth, error handler
- ├── services/        # Sharp image pipeline
- ├── app.ts           # App setup
- └── server.ts        # Entrypoint
+## Technical Highlights
 
-scripts/
- ├── generate_seed.ts # Writes seed.png to originals/
- └── load_test.ts     # Load generator
+- Designed **fault-tolerant horizontal scaling** for CPU-bound workloads  
+- Deployed **multi-container ECS architecture** with isolated scaling policies per service  
+- Implemented **secure presigned S3 uploads** and verified object integrity pre-processing  
+- Built **CI/CD workflow** for automatic container build, push, and ECS redeployment  
+- Integrated **CloudWatch alarms** and dashboards for autoscaling and latency metrics  
+- Optimised worker CPU utilisation to achieve >80% sustained usage under load test  
+- Configured **HTTPS** with ALB routing and ACM-issued TLS certificates  
 
-storage/
- ├── originals/       # Input images (seed.png)
- └── outputs/         # Job results
+---
 
-Dockerfile
-.dockerignore
-README.md
+## Performance Demonstration
+
+- Load tests simulated **20+ concurrent users** and **hundreds of queued jobs**  
+- ECS autoscaling expanded worker service from **1 → 3 containers** within 30 seconds under load  
+- CloudWatch metrics confirmed balanced distribution via SQS and stable API latency  
+- All scaling, processing, and retrieval operations maintained zero downtime  
+
+---
+
+## Infrastructure-as-Code Example (CDK)
+
+```ts
+const apiService = new ecs.FargateService(this, 'ApiService', {
+  cluster,
+  taskDefinition: apiTask,
+  desiredCount: 1,
+  assignPublicIp: true,
+  loadBalancers: [alb],
+});
+
+const workerService = new ecs.FargateService(this, 'WorkerService', {
+  cluster,
+  taskDefinition: workerTask,
+  desiredCount: 1,
+  assignPublicIp: true,
+});
+
+workerService.autoScaleTaskCount({ minCapacity: 1, maxCapacity: 3 })
+  .scaleOnCpuUtilization('CpuScaling', {
+    targetUtilizationPercent: 70,
+    policyName: 'WorkerCpuScaling',
+  });
 ```
 
 ---
 
-## 👥 Users
-- `alice` / `password1`  
-- `bob` / `password2`  
+## Cost Estimate (50 Concurrent Users)
+
+| Component | Service | Monthly Cost (approx.) |
+|------------|----------|------------------------|
+| API + Worker Containers | ECS Fargate | \$25 |
+| Storage | S3 | \$2 |
+| Database | DynamoDB | \$3 |
+| Messaging | SQS | \$1 |
+| Monitoring | CloudWatch | \$2 |
+| Edge Delivery | CloudFront | \$1 |
+| **Total Estimate** |  | **≈ \$34/month** |
 
 ---
 
-## 📜 License
-For educational use (CAB432 assignment).  
+## License  
+For educational and demonstration purposes only.  
+© 2025 Sandaru Nakandage
