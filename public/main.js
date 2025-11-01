@@ -5,6 +5,7 @@ const jobResultEl = $("#jobResult");
 const output = $("#output");
 const outputArea = document.getElementById("outputArea"); // dashboard variant
 const jobsListEl = document.getElementById("jobsList");
+const imageInput = document.getElementById("imageFile");
 
 let lastJobId = null;
 let token = localStorage.getItem("jwt") || null;
@@ -60,6 +61,7 @@ function clearJobUI() {
   renderOutputActions(false);
   const jf = document.getElementById("jobForm");
   if (jf && typeof jf.reset === "function") jf.reset();
+  if (imageInput) imageInput.value = "";
   lastJobId = null;
 }
 
@@ -214,20 +216,47 @@ if (jobForm) {
       return;
     }
 
+    const width = parseInt($("#w").value, 10);
+    const height = parseInt($("#h").value, 10);
+    const blur = parseInt($("#blur").value, 10);
+    const sharpen = parseInt($("#sharpen").value, 10);
+
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      toast("Width and height must be positive numbers.");
+      return;
+    }
+
     const ops = [
-      { op: "resize", width: parseInt($("#w").value, 10), height: parseInt($("#h").value, 10) },
-      { op: "blur", sigma: parseInt($("#blur").value, 10) },
-      { op: "sharpen", sigma: parseInt($("#sharpen").value, 10) },
+      { op: "resize", width, height },
+      { op: "blur", sigma: Number.isFinite(blur) ? blur : 0 },
+      { op: "sharpen", sigma: Number.isFinite(sharpen) ? sharpen : undefined },
     ];
 
-    const body = { sourceId: $("#sourceId").value, ops };
+    const file = imageInput?.files?.[0];
+    const allowedTypes = ["image/png", "image/jpeg"];
+    if (!file) {
+      toast("Choose an image to upload.");
+      return;
+    }
+    if (!allowedTypes.includes(file.type)) {
+      toast("Only PNG and JPEG images are supported.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast("Image must be 10MB or smaller.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("ops", JSON.stringify(ops));
+    formData.append("image", file);
+
     const res = await fetch("/v1/jobs", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(body),
+      body: formData,
     });
 
     if (res.status === 401) {

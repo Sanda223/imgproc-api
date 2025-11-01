@@ -1,14 +1,27 @@
 // src/routes/jobs.routes.ts
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
+import multer from "multer";
 import { requireAuth } from "../middleware/auth";
-import { runPipelineS3 } from "../services/process";
+import { runPipelineBuffer, runPipelineS3 } from "../services/process";
 import { presignUpload, presignDownload } from "../services/s3.service";
 import { initStore, addJob, updateJob, listJobs, getJobById, JobRecord } from "../data/jobs.ddb";
 import { requireGroup } from "../middleware/requireGroup";
 import { listAllJobs } from "../data/jobs.ddb";
 
 const r = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB cap for uploads
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/png", "image/jpeg"];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error("Only PNG and JPEG images are allowed."));
+    }
+    cb(null, true);
+  },
+});
 
 // ---------------- In-memory cache ----------------
 const LIST_CACHE = new Map<string, { data: any; expiresAt: number }>(); // userId -> { data, expiresAt }
@@ -49,9 +62,22 @@ initStore().catch(() => {
 });
 
 // ---- Create job ----
-r.post("/", requireAuth, async (req, res, next) => {
+r.post("/", requireAuth, upload.single("image"), async (req, res, next) => {
   try {
-    const { sourceId = "seed", ops } = req.body || {};
+    const file = req.file;
+    const rawOps = (req.body?.ops ?? req.body?.operations) as any;
+    let opsCandidate = rawOps;
+    if (typeof rawOps === "string") {
+      try {
+        opsCandidate = JSON.parse(rawOps);
+      } catch {
+        return res
+          .status(400)
+          .json({ error: { code: "bad_request", message: "Invalid ops JSON payload" } });
+      }
+    }
+    const ops = Array.isArray(opsCandidate) ? opsCandidate : [];
+
     if (!Array.isArray(ops) || ops.length === 0) {
       return res.status(400).json({ error: { code: "bad_request", message: "Provide ops array" } });
     }
@@ -60,8 +86,10 @@ r.post("/", requireAuth, async (req, res, next) => {
     const user = (req as any).user || {};
     const userId = user.sub ?? user.username ?? "unknown";
 
+    const sourceId = "upload";
+
     // S3 keys
-    const inputKey = sourceId === "seed" ? "seed/seed.png" : `users/${userId}/jobs/${id}/input`;
+    const inputKey = `users/${userId}/jobs/${id}/input`;
     const outputKey = `users/${userId}/jobs/${id}/output.png`;
 
     const job: JobRecord = {
@@ -69,30 +97,47 @@ r.post("/", requireAuth, async (req, res, next) => {
       userId,
       sourceId,
       ops,
-      status: sourceId === "seed" ? "processing" : "waiting_upload",
+      status: file ? "processing" : "waiting_upload",
       createdAt: new Date().toISOString(),
-      inputKey,
+      inputKey: file ? undefined : inputKey,
       outputKey,
     } as any;
 
     await addJob(job);
     invalidateUser(userId); // invalidate cache since new job added
 
-    if (sourceId === "seed") {
-      await runPipelineS3(inputKey, ops, outputKey);
-      await updateJob(id, { status: "done", finishedAt: new Date().toISOString() });
+    if (file) {
+      try {
+        await runPipelineBuffer(file.buffer, ops, outputKey);
+        await updateJob(id, { status: "done", finishedAt: new Date().toISOString() });
+      } catch (err) {
+        await updateJob(id, { status: "failed", finishedAt: new Date().toISOString() });
+        throw err;
+      }
 
       const downloadUrl = await presignDownload(outputKey);
       return res.status(201).json({ id, output: { imageId: id, url: downloadUrl } });
     }
 
-    const uploadUrl = await presignUpload(inputKey, "image/png");
+    if (!file) {
+      const contentType = (() => {
+        const candidate = typeof req.body?.contentType === "string" ? req.body.contentType : "image/png";
+        const allowed = ["image/png", "image/jpeg"];
+        return allowed.includes(candidate) ? candidate : "image/png";
+      })();
+      const uploadUrl = await presignUpload(inputKey, contentType);
+      return res.status(201).json({
+        id,
+        inputKey,
+        outputKey,
+        upload: { url: uploadUrl, key: inputKey, contentType },
+        message: "Upload your image to the provided URL, then call the processing endpoint when ready.",
+      });
+    }
+
     return res.status(201).json({
       id,
-      inputKey,
-      outputKey,
-      upload: { url: uploadUrl, key: inputKey },
-      message: "Upload your image to the provided URL, then call the processing endpoint when ready.",
+      output: { imageId: id, url: await presignDownload(outputKey) },
     });
   } catch (e) {
     next(e);
