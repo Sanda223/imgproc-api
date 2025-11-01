@@ -136,7 +136,3 @@ workerService.autoScaleTaskCount({ minCapacity: 1, maxCapacity: 3 })
 | **Total Estimate** |  | **≈ \$34/month** |
 
 ---
-
-## License  
-For educational and demonstration purposes only.  
-© 2025 Sandaru Nakandage
