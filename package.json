@@ -4,9 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev:api": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev:worker": "ts-node-dev --respawn --transpile-only src/min-server.ts",
+    "dev": "npm run dev:api",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start:api": "node dist/server.js",
+    "start:worker": "node dist/min-server.js",
     "seed": "ts-node scripts/generate_seed.ts",
     "load:test": "ts-node scripts/load_test.ts"
   },
@@ -30,6 +33,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.1",
     "multer": "^1.4.5-lts.1",
+    "node-fetch": "^2.7.0",
     "sharp": "^0.34.3"
   },
   "devDependencies": {
@@ -39,6 +43,7 @@
     "@types/morgan": "^1.9.10",
     "@types/multer": "^1.4.12",
     "@types/node": "^24.7.0",
+    "@types/node-fetch": "^2.6.13",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.2"
