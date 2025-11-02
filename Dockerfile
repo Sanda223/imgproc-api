@@ -24,7 +24,8 @@ RUN npm ci --omit=dev
 
 # Copy built artifacts from the build stage
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/public ./public
+#COPY --from=build /app/public ./public
+COPY --from=build /app/public ./dist/public
 
 # Expose API port
 EXPOSE 3000
