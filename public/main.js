@@ -3,7 +3,7 @@ const $ = (s) => document.querySelector(s);
 const authStatus = $("#authStatus");
 const jobResultEl = $("#jobResult");
 const output = $("#output");
-const outputArea = document.getElementById("outputArea"); // dashboard variant
+const outputArea = document.getElementById("outputArea");
 const jobsListEl = document.getElementById("jobsList");
 const imageInput = document.getElementById("imageFile");
 
@@ -76,12 +76,10 @@ function renderAuth() {
   authStatus.innerHTML = 'Logged in ✅ &nbsp;<button id="logoutBtn">Logout</button>';
 }
 
-// Page-level helpers
+// ----------------- Page helpers -----------------
 const path = window.location.pathname;
-const isDashboard =
-  path === "/" || path.startsWith("/dashboard");
+const isDashboard = path === "/" || path.startsWith("/dashboard");
 
-// If on dashboard without a valid token, bounce to login
 if (isDashboard && (!token || isExpired(token))) {
   window.location.replace("/login");
 }
@@ -89,8 +87,9 @@ if (isDashboard && (!token || isExpired(token))) {
 // ----------------- Global handlers -----------------
 document.addEventListener("click", (e) => {
   const target = e.target;
+  if (!target) return;
 
-  if (target && target.id === "logoutBtn") {
+  if (target.id === "logoutBtn") {
     localStorage.removeItem("jwt");
     token = null;
     clearJobUI();
@@ -99,15 +98,15 @@ document.addEventListener("click", (e) => {
     window.location.href = "/login";
   }
 
-  if (target && target.id === "downloadBtn") {
+  if (target.id === "downloadBtn") {
     onDownloadClicked().catch(() => toast("Failed to get download link."));
   }
 
-  if (target && target.id === "listJobsBtn") {
+  if (target.id === "listJobsBtn") {
     onListJobsClicked().catch(() => toast("Failed to list jobs."));
   }
 
-  if (target && target.classList.contains("dlOneBtn")) {
+  if (target.classList.contains("dlOneBtn")) {
     const jobId = target.getAttribute("data-jobid");
     downloadById(jobId).catch(() => toast("Failed to get download link."));
   }
@@ -116,9 +115,8 @@ document.addEventListener("click", (e) => {
 ensureTokenFresh();
 renderAuth();
 
-// Auto-load jobs when landing on dashboard with a valid token
 if (isDashboard && token && !isExpired(token)) {
-  renderOutputActions(!!lastJobId); // show button (disabled if none yet)
+  renderOutputActions(!!lastJobId);
   showRecentJobs().catch(() => {});
 }
 
@@ -137,9 +135,8 @@ if (signupForm) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-
     if (res.ok) {
-      toast("Signup successful! Check email for the confirmation code.");
+      toast("Signup successful! Check email for confirmation.");
       localStorage.setItem("pendingUser", body.username);
       window.location.href = "/confirm";
     } else {
@@ -153,7 +150,6 @@ const confirmForm = document.getElementById("confirmForm");
 if (confirmForm) {
   const pendingUser = localStorage.getItem("pendingUser");
   if (pendingUser && $("#cUsername")) $("#cUsername").value = pendingUser;
-
   confirmForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const body = {
@@ -165,7 +161,6 @@ if (confirmForm) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-
     if (res.ok) {
       toast("Email confirmed! You can now log in.");
       localStorage.removeItem("pendingUser");
@@ -190,7 +185,6 @@ if (loginForm) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-
     if (!res.ok) {
       const err = await safeJson(res);
       toast("Login failed: " + (err?.error?.message ?? res.statusText));
@@ -206,7 +200,7 @@ if (loginForm) {
   });
 }
 
-// ----------------- JOBS -----------------
+// ----------------- JOB FLOW -----------------
 const jobForm = document.getElementById("jobForm");
 if (jobForm) {
   jobForm.addEventListener("submit", async (e) => {
@@ -233,70 +227,93 @@ if (jobForm) {
     ];
 
     const file = imageInput?.files?.[0];
-    const allowedTypes = ["image/png", "image/jpeg"];
     if (!file) {
       toast("Choose an image to upload.");
       return;
     }
-    if (!allowedTypes.includes(file.type)) {
-      toast("Only PNG and JPEG images are supported.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast("Image must be 10MB or smaller.");
-      return;
-    }
 
-    const formData = new FormData();
-    formData.append("ops", JSON.stringify(ops));
-    formData.append("image", file);
+    try {
+      // 1️⃣ Create job and get presigned upload URL
+      const createRes = await fetch("/v1/jobs", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ops,
+          contentType: file.type,
+        }),
+      });
 
-    const res = await fetch("/v1/jobs", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
+      if (!createRes.ok) throw new Error("Failed to create job.");
+      const jobData = await createRes.json();
+      lastJobId = jobData.id;
+      toast("Job created, uploading image...");
 
-    if (res.status === 401) {
-      localStorage.removeItem("jwt");
-      token = null;
-      clearJobUI();
-      renderAuth();
-      toast("Session expired. Please log in again.");
-      return;
-    }
+      // 2️⃣ Upload image directly to S3
+      const uploadUrl = jobData?.upload?.url;
+      if (!uploadUrl) throw new Error("Missing upload URL.");
 
-    const data = await safeJson(res);
+      await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
 
-    if (res.ok) {
-      lastJobId = data?.id || null;
-      const url =
-        data?.output?.url ??
-        (data?.output?.imageId ? `/v1/images/${data.output.imageId}` : null);
+      toast("Image uploaded. Processing...");
 
-      const outEl = outputArea || output;
-      if (outEl) {
-        const hasOutput = !!url;
-        // Put image (or message) into the preview box only
-        outEl.innerHTML = hasOutput
-          ? `<img src="${url}" alt="result" style="max-width:100%;max-height:100%;height:auto;display:block;object-fit:contain;" />`
-          : "Job created, but no output URL yet.";
+      // 3️⃣ Trigger processing (enqueue job)
+      const procRes = await fetch(`/v1/jobs/${lastJobId}/process`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
 
-        // Render/refresh the download button in the header actions area
-        renderOutputActions(hasOutput);
-      }
+      if (!procRes.ok) throw new Error("Failed to start processing.");
+      toast("Job queued for processing.");
 
-      // 🔄 refresh the Job History after creating a job
+      // 🔄 Start polling for completion and preview when done
+      waitForJobDone(lastJobId).catch(console.error);
+
       await showRecentJobs();
-    } else {
+    } catch (err) {
+      console.error(err);
+      toast("Job failed: " + err.message);
       const outEl = outputArea || output;
       if (outEl) outEl.textContent = "Job failed.";
     }
   });
 }
 
+// 🔄 Poll until job is done and show image preview
+async function waitForJobDone(jobId) {
+  for (let i = 0; i < 15; i++) { // ~30s total
+    await new Promise((r) => setTimeout(r, 2000));
+    const res = await fetch(`/v1/jobs/${jobId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) continue;
+    const job = await res.json();
+    if (job.status === "done") {
+      const dlRes = await fetch(`/v1/jobs/${jobId}/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!dlRes.ok) break;
+      const data = await dlRes.json();
+      const outEl = outputArea || output;
+      outEl.innerHTML = `<img src="${data.downloadUrl}" alt="Processed image" style="max-width:100%;max-height:100%;height:auto;display:block;object-fit:contain;" />`;
+      toast("✅ Job complete!");
+      await showRecentJobs();
+      return;
+    }
+  }
+  toast("Job still processing or failed to complete.");
+}
+
+// ----------------- Download & Listing -----------------
 function renderOutputActions(enabled) {
   const actions = document.getElementById("outputActions");
   if (!actions) return;
@@ -305,14 +322,8 @@ function renderOutputActions(enabled) {
 }
 
 async function onDownloadClicked() {
-  if (!token) {
-    toast("Login first");
-    return;
-  }
-  if (!lastJobId) {
-    toast("No job to download yet.");
-    return;
-  }
+  if (!token) return toast("Login first");
+  if (!lastJobId) return toast("No job to download yet.");
   await downloadById(lastJobId);
 }
 
@@ -326,7 +337,8 @@ async function downloadById(jobId) {
     return;
   }
   const data = await res.json();
-  window.open(data.downloadUrl, "_blank");
+  const outEl = outputArea || output;
+  outEl.innerHTML = `<img src="${data.downloadUrl}" alt="Processed image" style="max-width:100%;max-height:100%;height:auto;display:block;object-fit:contain;" />`;
 }
 
 async function onListJobsClicked() {
@@ -339,12 +351,9 @@ async function showRecentJobs() {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await safeJson(res);
-
   const container = document.getElementById("jobsList") || (outputArea || output);
   const items = Array.isArray(data.items) ? data.items : [];
-
   if (!container) return;
-
   if (items.length === 0) {
     container.innerHTML = `<div class="muted">No jobs yet.</div>`;
     return;
@@ -368,10 +377,7 @@ async function showRecentJobs() {
     <table style="width:100%; border-collapse:collapse;">
       <thead>
         <tr>
-          <th style="text-align:left;border-bottom:1px solid #5c58a3;">Job ID</th>
-          <th style="text-align:left;border-bottom:1px solid #5c58a3;">Status</th>
-          <th style="text-align:left;border-bottom:1px solid #5c58a3;">Created</th>
-          <th style="text-align:left;border-bottom:1px solid #5c58a3;">Action</th>
+          <th>Job ID</th><th>Status</th><th>Created</th><th>Action</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>

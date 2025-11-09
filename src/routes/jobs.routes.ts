@@ -13,36 +13,9 @@ import {
   listAllJobs,
 } from "../data/jobs.ddb";
 import { requireGroup } from "../middleware/requireGroup";
+import { enqueueJob } from "../services/sqs.service"; // ✅ NEW
 
 const r = Router();
-
-// ---------------------------------------------------------------------------
-// Config for worker call
-const WORKER_URL = process.env.WORKER_URL || "http://localhost:3001";
-const WORKER_TOKEN = process.env.WORKER_TOKEN || ""; // must match worker if set
-
-// Simple helper (Node 18+ has global fetch)
-async function postJson(url: string, body: any, headers: Record<string, string> = {}) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
-    body: JSON.stringify(body),
-  });
-  let data: any = null;
-  try {
-    data = await res.json();
-  } catch {
-    /* ignore */
-  }
-  if (!res.ok) {
-    const msg = data?.error || res.statusText || "request_failed";
-    const err = new Error(String(msg));
-    (err as any).status = res.status;
-    (err as any).data = data;
-    throw err;
-  }
-  return data;
-}
 
 // ---------------- In-memory cache for list ---------------------------------
 const LIST_CACHE = new Map<string, { data: any; expiresAt: number }>(); // userId -> { data, expiresAt }
@@ -149,7 +122,7 @@ r.post("/", requireAuth, async (req, res, next) => {
   }
 });
 
-// ---- Process job (calls WORKER over HTTP) ----------------------------------
+// ---- Process job (enqueue to SQS for worker) ------------------------------
 r.post("/:id/process", requireAuth, async (req, res, next) => {
   try {
     const job = await getJobById(req.params.id);
@@ -157,8 +130,9 @@ r.post("/:id/process", requireAuth, async (req, res, next) => {
 
     const user = (req as any).user || {};
     const userId = user.sub ?? user.username ?? "unknown";
-    if (job.userId !== userId)
+    if (job.userId !== userId) {
       return res.status(403).json({ error: { code: "forbidden" } });
+    }
 
     if (job.status !== "waiting_upload" && job.status !== "failed") {
       return res
@@ -166,24 +140,35 @@ r.post("/:id/process", requireAuth, async (req, res, next) => {
         .json({ error: { code: "bad_state", message: `Job is ${job.status}` } });
     }
 
+    // Make sure we actually have S3 keys before enqueuing
+    if (!job.inputKey || !job.outputKey) {
+      return res.status(400).json({
+        error: {
+          code: "bad_state",
+          message: "Job is missing S3 keys; recreate the job.",
+        },
+      });
+    }
+
+    // Move job into processing state before enqueue
     await updateJob(job.id, { status: "processing" });
-
-    // Call the worker
-    await postJson(
-      `${WORKER_URL}/v1/worker/process`,
-      { inputKey: job.inputKey, outputKey: job.outputKey, ops: job.ops },
-      WORKER_TOKEN ? { "X-Worker-Token": WORKER_TOKEN } : {}
-    );
-
-    await updateJob(job.id, {
-      status: "done",
-      finishedAt: new Date().toISOString(),
-    });
-
     invalidateUser(userId);
 
-    const downloadUrl = await presignDownload(job.outputKey!);
-    res.json({ id: job.id, output: { imageId: job.id, url: downloadUrl } });
+    // Enqueue work for the worker service via SQS
+    await enqueueJob({
+      jobId: job.id,
+      userId,
+      inputKey: job.inputKey,
+      outputKey: job.outputKey,
+      ops: job.ops,
+    });
+
+    // Respond to client – processing happens asynchronously now
+    return res.status(202).json({
+      id: job.id,
+      status: "processing",
+      message: "Job has been queued for processing.",
+    });
   } catch (e) {
     next(e);
   }

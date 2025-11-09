@@ -1,8 +1,11 @@
 // src/min-server.ts
+import "dotenv/config";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 import { runPipelineS3 } from "./services/process";
+import { startSqsWorkerLoop } from "./services/sqs.service";
+import { loadConfig } from "./services/config"; // ✅ NEW
 
 // ---- config (env) ----------------------------------------------------------
 const PORT = parseInt(process.env.WORKER_PORT || "3001", 10);
@@ -27,6 +30,7 @@ function verifyToken(req: express.Request): boolean {
  * POST /v1/worker/process
  * Body: { inputKey: string, outputKey: string, ops: Array<any> }
  * Does the CPU-intensive sharp pipeline and returns 200 when done.
+ * This is kept for backward compatibility (manual triggering).
  */
 app.post("/v1/worker/process", async (req, res) => {
   if (!verifyToken(req)) return res.status(401).json({ error: "unauthorised" });
@@ -45,6 +49,17 @@ app.post("/v1/worker/process", async (req, res) => {
   }
 });
 
+// ---- Start HTTP server, then config, then SQS worker loop ------------------
 app.listen(PORT, () => {
   console.log(`🛠️  Worker service listening on :${PORT}`);
+
+  // Load SSM-based config (DDB table, S3 bucket, etc.) before touching DynamoDB
+  loadConfig()
+    .then(() => {
+      console.log("✅ Config loaded, starting SQS polling loop...");
+      return startSqsWorkerLoop();
+    })
+    .catch((err) => {
+      console.error("❌ Failed to initialise worker config:", err);
+    });
 });
